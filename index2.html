@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>Stav lisů</title>
+
+<style>
+body{font-family:Segoe UI,Arial;background:#0b1220;color:white;margin:0;padding:20px;}
+h1{text-align:center;margin-bottom:10px;font-size:34px;}
+.topbar{text-align:center;margin-bottom:25px;}
+button{
+background:#22c55e;
+border:none;
+padding:12px 22px;
+border-radius:8px;
+font-size:18px;
+cursor:pointer;color:white;
+}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+.card{background:#1e293b;padding:20px;border-radius:14px;}
+input{width:100%;padding:12px;margin-bottom:12px;border-radius:6px;border:none;font-size:18px;}
+.production{display:none;}
+.productionRowTop{display:grid;grid-template-columns:repeat(3,1fr);gap:35px;margin-bottom:35px;}
+.productionRowBottom{display:grid;grid-template-columns:repeat(4,1fr);gap:35px;}
+.prodCard{background:#111827;padding:45px;border-radius:22px;text-align:center;box-shadow:0 0 35px rgba(0,0,0,0.6);transition:0.4s;}
+.prodLis{font-size:70px;font-weight:bold;margin-bottom:25px;}
+.prodKontakt{font-size:60px;color:#22d3ee;}
+.prodPrurez{font-size:52px;color:#fbbf24;}
+.prodJmeno{font-size:46px;color:#a3e635;margin-top:15px;}
+.hotovo{margin-top:25px;background:#ef4444;font-size:20px;padding:12px 24px;}
+.blink{animation:blinkAnim 1s infinite;}
+@keyframes blinkAnim{0%{background:#22c55e}50%{background:#111827}100%{background:#22c55e}}
+</style>
+</head>
+
+<body>
+
+<h1>Ovládání lisů</h1>
+
+<div class="topbar">
+<button onclick="productionMode()">Výrobní obrazovka</button>
+</div>
+
+<div class="grid" id="controlPanel"></div>
+
+<div class="production">
+<div class="productionRowTop" id="rowTop"></div>
+<div class="productionRowBottom" id="rowBottom"></div>
+</div>
+
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+const LIS_COUNT = 7;
+let data=[];
+let lastData=[];
+
+function createEmpty(){return {kontakt:"",prurez:"",jmeno:""}}
+
+// --- Firebase config ---
+const firebaseConfig = {
+  apiKey: "AIzaSyBIr-vbsHA6Q8lQBWzzTpBdc9XtmqDSpKQ",
+  authDomain: "test-b45b2.firebaseapp.com",
+  databaseURL: "https://test-b45b2-default-rtdb.firebaseio.com",
+  projectId: "test-b45b2",
+  storageBucket: "test-b45b2.firebasestorage.app",
+  messagingSenderId: "14482577715",
+  appId: "1:14482577715:web:53246583e709e67e15c646"
+};
+
+// Inicializace Firebase
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// --- Funkce pro načtení dat z Firebase ---
+function load(){
+  const tableRef = database.ref('lisy');
+  tableRef.once('value').then(snapshot=>{
+    const stored = snapshot.val();
+    if(stored && stored.length === LIS_COUNT){
+      data = stored;
+    }else{
+      data = Array.from({length:LIS_COUNT},()=>createEmpty());
+    }
+    lastData = JSON.parse(JSON.stringify(data));
+    renderControl();
+    updateProduction();
+  });
+}
+
+// --- Uložení dat do Firebase ---
+function save(){
+  database.ref('lisy').set(data);
+}
+
+// --- Vymazání řádku ---
+function hotovo(i){
+  data[i]=createEmpty();
+  save();
+}
+
+// --- Vykreslení ovládacího panelu ---
+function renderControl(){
+  const panel=document.getElementById("controlPanel");
+  panel.innerHTML="";
+  for(let i=0;i<LIS_COUNT;i++){
+    panel.innerHTML+=`
+    <div class="card">
+      <h2>Lis ${i+1}</h2>
+      <input placeholder="Číslo kontaktu" value="${data[i].kontakt}" oninput="data[${i}].kontakt=this.value">
+      <input placeholder="Průřez vodiče" value="${data[i].prurez}" oninput="data[${i}].prurez=this.value">
+      <input placeholder="Pro koho" value="${data[i].jmeno}" oninput="data[${i}].jmeno=this.value">
+      <button onclick="save()">Uložit</button>
+    </div>`;
+  }
+}
+
+// --- Vytvoření karty pro výrobní obrazovku ---
+function createCard(i){
+  return `
+  <div class="prodCard" id="lis${i}">
+    <div class="prodLis">LIS ${i+1}</div>
+    <div class="prodKontakt">${data[i].kontakt||"---"}</div>
+    <div class="prodPrurez">${data[i].prurez||"---"}</div>
+    <div class="prodJmeno">${data[i].jmeno||"---"}</div>
+    <button class="hotovo" onclick="hotovo(${i})">HOTOVO</button>
+  </div>`;
+}
+
+// --- Aktualizace výrobní obrazovky ---
+function updateProduction(){
+  const top=document.getElementById("rowTop");
+  const bottom=document.getElementById("rowBottom");
+  const existingBlinks={};
+  for(let i=0;i<LIS_COUNT;i++){
+    const old=document.getElementById("lis"+i);
+    if(old && old.classList.contains("blink")) existingBlinks[i]=true;
+  }
+  top.innerHTML="";
+  bottom.innerHTML="";
+  for(let i=0;i<3;i++){top.innerHTML+=createCard(i);}
+  for(let i=3;i<7;i++){bottom.innerHTML+=createCard(i);}
+  for(let i=0;i<LIS_COUNT;i++){
+    const card=document.getElementById("lis"+i);
+    if(existingBlinks[i] && card) card.classList.add("blink");
+  }
+}
+
+// --- Zvukové upozornění ---
+function playChime(){
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  function note(freq,time,dur){
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type="sine";
+    osc.frequency.value=freq;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(time);
+    osc.stop(time+dur);
+  }
+  let t=audioCtx.currentTime;
+  note(1000,t,0.25);
+  note(700,t+0.35,0.35);
+  note(1000,t+1,0.25);
+  note(700,t+1.35,0.35);
+  setTimeout(()=>{audioCtx.close()},2000);
+}
+
+function blinkChangedLis(newData){
+  for(let i=0;i<LIS_COUNT;i++){
+    if(JSON.stringify(newData[i])!==JSON.stringify(lastData[i])){
+      const card=document.getElementById("lis"+i);
+      if(card){
+        card.classList.add("blink");
+        playChime();
+        setTimeout(()=>{card.classList.remove("blink")},10000);
+      }
+    }
+  }
+}
+
+function productionMode(){
+  document.querySelector(".grid").style.display="none";
+  document.querySelector(".topbar").style.display="none";
+  document.querySelector(".production").style.display="block";
+}
+
+// --- Sledování změn v Firebase ---
+database.ref('lisy').on('value', snapshot=>{
+  const newData = snapshot.val();
+  if(!newData) return;
+  data = newData;
+  renderControl();
+  updateProduction();
+  blinkChangedLis(newData);
+  lastData=JSON.parse(JSON.stringify(newData));
+});
+
+// --- Spuštění ---
+load();
+
+</script>
+
+</body>
+</html>
